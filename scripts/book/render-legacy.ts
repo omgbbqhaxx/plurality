@@ -2,6 +2,8 @@ import { rmSync, existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } fr
 import { join } from 'node:path'
 import { spawnSync, SpawnSyncOptions } from 'node:child_process'
 import { assembleLocale } from './build'
+import { LOCALES, getLocale, isLocale } from './locales.mjs'
+import type { Locale } from './locales.d.mts'
 
 export type SpawnFn = (
   cmd: string,
@@ -17,12 +19,13 @@ const defaultSpawn: SpawnFn = (cmd, args, opts) => {
 const defaultImage = 'audreyt/pandoc-plurality-book@sha256:6a73d724203283dad9d098d8bb44f7282972dec5862bb6c14034af496d232698'
 
 export async function renderLegacyLocale(
-  locale: 'en' | 'zh-TW',
+  locale: Locale,
   bookDate: string,
   outputRoot: string,
   spawnFn: SpawnFn = defaultSpawn
 ): Promise<void> {
-  const localeFilename = locale === 'en' ? 'english' : 'traditional-mandarin'
+  const definition = getLocale(locale)
+  const localeFilename = definition.directory
   const legacyDir = join(outputRoot, 'legacy')
   mkdirSync(legacyDir, { recursive: true })
   const pdfPath = join(legacyDir, `Plurality-${localeFilename}.pdf`)
@@ -118,12 +121,12 @@ export async function renderLegacyLocale(
     '-s',
     '--pdf-engine=xelatex',
     '-V', 'CJKmainfont=Noto Sans CJK TC',
-    '-V', `fontsize=${locale === 'en' ? '18pt' : '20pt'}`,
+    '-V', `fontsize=${definition.legacy.fontSize}`,
     '-V', 'documentclass=extreport',
     '-f', 'markdown-implicit_figures',
     '--filter=/data/scripts/emoji_filter.js'
   ]
-  if (locale === 'zh-TW') {
+  if (definition.legacy.forceLangEnUs) {
     xelatexArgs.push('-M', 'lang=en-US')
   }
   runSpawn(xelatexArgs)
@@ -135,7 +138,7 @@ export async function renderLegacyLocale(
     ...userArgs,
     image,
     `A=/data/dist/publication/.legacy-work/${locale}/tmp.pdf`,
-    `B=/data/scripts/cover-image${locale === 'en' ? '' : '.zh-tw'}.pdf`,
+    `B=/data/${definition.coverPdf}`,
     'cat', 'B', 'A2-end',
     'output', `/data/dist/publication/legacy/Plurality-${localeFilename}.pdf`
   ])
@@ -156,8 +159,8 @@ export async function renderLegacyLocale(
     '--resource-path=/data',
     '--filter=/data/scripts/emoji_filter.js'
   ]
-  if (locale === 'zh-TW') {
-    epubArgs.push('--css=/data/scripts/epub-cjk.css')
+  if (definition.legacy.epubCss) {
+    epubArgs.push(`--css=${definition.legacy.epubCss}`)
   }
   runSpawn(epubArgs)
 
@@ -171,14 +174,13 @@ export async function renderLegacyLocale(
 }
 
 export async function runLegacyOrchestrator(
-  target: 'en' | 'zh-TW' | 'all',
+  target: Locale | 'all',
   bookDate: string,
   outputRoot: string,
   spawnFn: SpawnFn = defaultSpawn
 ): Promise<void> {
   if (target === 'all') {
-    await renderLegacyLocale('en', bookDate, outputRoot, spawnFn)
-    await renderLegacyLocale('zh-TW', bookDate, outputRoot, spawnFn)
+    for (const locale of LOCALES) await renderLegacyLocale(locale, bookDate, outputRoot, spawnFn)
   } else {
     await renderLegacyLocale(target, bookDate, outputRoot, spawnFn)
   }
@@ -186,9 +188,9 @@ export async function runLegacyOrchestrator(
 
 const meta = import.meta as unknown as { main: boolean }
 if (meta.main) {
-  const target = process.argv[2] as 'en' | 'zh-TW' | 'all' | undefined
-  if (!target || (target !== 'en' && target !== 'zh-TW' && target !== 'all')) {
-    throw new Error('Usage: BOOK_DATE=YYYY-MM-DD bun scripts/book/render-legacy.ts <en|zh-TW|all>')
+  const target = process.argv[2] as Locale | 'all' | undefined
+  if (!target || (!isLocale(target) && target !== 'all')) {
+    throw new Error(`Usage: BOOK_DATE=YYYY-MM-DD bun scripts/book/render-legacy.ts <${LOCALES.join('|')}|all>`)
   }
   const bookDate = process.env.BOOK_DATE
   if (!bookDate || !/^\d{4}-\d{2}-\d{2}$/.test(bookDate)) {

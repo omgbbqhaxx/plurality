@@ -1,10 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, relative, resolve, isAbsolute } from 'node:path'
 import { assembleLocale } from './build'
+import { LOCALES, isLocale } from './locales.mjs'
+import type { Locale } from './locales.d.mts'
 
-export function prepareVivliostyle(root: string, locale: 'en' | 'zh-TW', buildDir: string, bookDate: string): void {
-  if (!locale || (locale !== 'en' && locale !== 'zh-TW')) {
-    throw new Error(`Invalid BOOK_LOCALE: ${locale}`)
+export function prepareVivliostyle(root: string, locale: Locale, buildDir: string, bookDate: string): void {
+  if (!isLocale(locale)) {
+    throw new Error(`Invalid BOOK_LOCALE: ${locale}. Known locales: ${LOCALES.join(', ')}`)
   }
   if (!buildDir || buildDir.trim() === '') {
     throw new Error('BUILD_DIR must be specified')
@@ -77,8 +79,8 @@ export function prepareVivliostyle(root: string, locale: 'en' | 'zh-TW', buildDi
 // Cast import.meta to read Bun-specific main property during direct script execution
 const meta = import.meta as unknown as { main: boolean }
 if (meta.main) {
-  const locale = process.env.BOOK_LOCALE as 'en' | 'zh-TW' | undefined
-  if (!locale) throw new Error('BOOK_LOCALE is required (en|zh-TW)')
+  const locale = process.env.BOOK_LOCALE as Locale | undefined
+  if (!locale) throw new Error(`BOOK_LOCALE is required (${LOCALES.join('|')})`)
   const buildDir = process.env.BUILD_DIR
   if (!buildDir) throw new Error('BUILD_DIR is required')
   const bookDate = process.env.BOOK_DATE

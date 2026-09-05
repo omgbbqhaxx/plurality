@@ -97,13 +97,14 @@ jobs:
             dist/publication/manifest.json
             dist/publication/en/Plurality-english.md
             dist/publication/zh-TW/Plurality-traditional-mandarin.md
+            dist/publication/tr/Plurality-turkish.md
 
   legacy:
     runs-on: ubuntu-latest
     needs: manifest
     strategy:
       matrix:
-        locale: [en, zh-TW]
+        locale: [en, zh-TW, tr]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -172,7 +173,7 @@ jobs:
     needs: manifest
     strategy:
       matrix:
-        locale: [en, zh-TW]
+        locale: [en, zh-TW, tr]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -291,7 +292,7 @@ jobs:
           artifactErrorsFailBuild: true
           tag: latest
           name: "Latest Book Release"
-          artifacts: "dist/publication/manifest.json,dist/publication/legacy/Plurality-english.pdf,dist/publication/legacy/Plurality-english.epub,dist/publication/legacy/Plurality-traditional-mandarin.pdf,dist/publication/legacy/Plurality-traditional-mandarin.epub"
+          artifacts: "dist/publication/manifest.json,dist/publication/legacy/Plurality-english.pdf,dist/publication/legacy/Plurality-english.epub,dist/publication/legacy/Plurality-traditional-mandarin.pdf,dist/publication/legacy/Plurality-traditional-mandarin.epub,dist/publication/legacy/Plurality-turkish.pdf,dist/publication/legacy/Plurality-turkish.epub"
           body: |
             Publication date: ${{ steps.release-meta.outputs.book_date }}
             Source revision: ${{ steps.release-meta.outputs.source_revision }}
@@ -340,7 +341,7 @@ jobs:
           echo "Pre-toggle assets: $PRE_ASSETS"
 
           # Assert that all 6 managed assets (including manifest and MP3) are present before toggling
-          EXPECTED_NAMES='["manifest.json","Plurality-english.pdf","Plurality-english.epub","Plurality-traditional-mandarin.pdf","Plurality-traditional-mandarin.epub","Plurality-english.mp3"]'
+          EXPECTED_NAMES='["manifest.json","Plurality-english.pdf","Plurality-english.epub","Plurality-traditional-mandarin.pdf","Plurality-traditional-mandarin.epub","Plurality-turkish.pdf","Plurality-turkish.epub","Plurality-english.mp3"]'
           MISSING_PRE=$(echo "$PRE_ASSETS" | jq --argjson expected "$EXPECTED_NAMES" -r '
             ($expected - [.[] | .name]) | join(", ")
           ')

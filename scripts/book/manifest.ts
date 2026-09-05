@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join, basename } from 'node:path'
+import { join } from 'node:path'
+import { LOCALES, getLocale } from './locales.mjs'
+import type { Locale } from './locales.d.mts'
 
 export interface ChapterManifest {
   id: string
@@ -27,7 +29,7 @@ export interface BookManifest {
   schemaVersion: string
   sourceRevision: string
   publicationDate: string
-  locales: Record<'en' | 'zh-TW', LocaleManifest>
+  locales: Record<Locale, LocaleManifest>
 }
 
 const readUtf8 = (path: string): string => readFileSync(path, 'utf8')
@@ -56,57 +58,41 @@ export function generateManifest(root: string, bookDate: string, sourceRevision:
   if (!/^\d{4}-\d{2}-\d{2}$/.test(bookDate)) throw new Error(`Invalid BOOK_DATE: ${bookDate}`)
   if (!sourceRevision || sourceRevision.trim() === '') throw new Error('Invalid sourceRevision: cannot be empty')
 
-  const locales: Record<'en' | 'zh-TW', LocaleManifest> = {
-    en: {
-      language: 'en',
-      title: 'Plurality',
-      manuscriptPath: 'en/Plurality-english.md',
+  const locales = {} as Record<Locale, LocaleManifest>
+  for (const locale of LOCALES) {
+    const definition = getLocale(locale)
+    locales[locale] = {
+      language: locale,
+      title: definition.title,
+      manuscriptPath: `${locale}/${definition.filePrefix}.md`,
       legacyOutputs: {
-        pdf: 'legacy/Plurality-english.pdf',
-        epub: 'legacy/Plurality-english.epub',
+        pdf: `legacy/${definition.filePrefix}.pdf`,
+        epub: `legacy/${definition.filePrefix}.epub`,
       },
       vivliostyleOutputs: {
-        pdf: 'candidate/vivliostyle-en-candidate.pdf',
-        epub: 'candidate/vivliostyle-en-candidate.epub',
+        pdf: `candidate/vivliostyle-${locale}-candidate.pdf`,
+        epub: `candidate/vivliostyle-${locale}-candidate.epub`,
       },
       chapters: [],
-    },
-    'zh-TW': {
-      language: 'zh-TW',
-      title: '多元宇宙',
-      manuscriptPath: 'zh-TW/Plurality-traditional-mandarin.md',
-      legacyOutputs: {
-        pdf: 'legacy/Plurality-traditional-mandarin.pdf',
-        epub: 'legacy/Plurality-traditional-mandarin.epub',
-      },
-      vivliostyleOutputs: {
-        pdf: 'candidate/vivliostyle-zh-TW-candidate.pdf',
-        epub: 'candidate/vivliostyle-zh-TW-candidate.epub',
-      },
-      chapters: [],
-    },
+    }
   }
 
-  const localeConfigs = [
-    { key: 'en' as const, dir: 'english' },
-    { key: 'zh-TW' as const, dir: 'traditional-mandarin' },
-  ]
-
-  for (const config of localeConfigs) {
-    const dirPath = join(root, 'contents', config.dir)
+  for (const locale of LOCALES) {
+    const localeDir = getLocale(locale).directory
+    const dirPath = join(root, 'contents', localeDir)
     const files = readdirSync(dirPath).filter((name) => /^[1-7].*\.md$/.test(name)).sort()
 
     const ids = new Set<string>()
     const chapters: ChapterManifest[] = []
 
     for (const file of files) {
-      const chapter = parseChapter(root, config.dir, file)
-      if (ids.has(chapter.id)) throw new Error(`Duplicate chapter ID "${chapter.id}" in locale ${config.key}`)
+      const chapter = parseChapter(root, localeDir, file)
+      if (ids.has(chapter.id)) throw new Error(`Duplicate chapter ID "${chapter.id}" in locale ${locale}`)
       ids.add(chapter.id)
       chapters.push(chapter)
     }
 
-    locales[config.key].chapters = chapters
+    locales[locale].chapters = chapters
   }
 
   return {

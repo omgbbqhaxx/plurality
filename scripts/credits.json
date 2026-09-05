@@ -7,6 +7,10 @@
     "zh": {
       "intro": "以下呈現的是本專案中 ⿻ 積分的現況——這是一種我們用來追蹤貢獻的社群貨幣，詳情於正文中進一步討論。每位貢獻者僅歸類於一個貢獻領域，即使他們做出了多種類型的貢獻。各類別內的排序及整體字體大小，反映截至 2024 年 4 月初的 ⿻ 持有量，我們也使用相同的權重來製作上方的合成影像。此列表不包括兩位主要作者，因為他們已在上方充分標示；也不包括僅因推薦而獲得積分的人，因為他們已按積分順序列於本書開頭頁面或封面。由於我們使用的追蹤技術仍屬實驗性質，帳目若有任何錯誤，敬請見諒，我們將在線上版本及未來版本中加以更正。",
       "categories": { "Writing": "寫作", "Editing": "編輯", "Technical": "技術", "Translation": "翻譯", "Visuals": "視覺設計", "Data": "資料", "Management": "管理", "Public relations": "公共關係", "Research": "研究" }
+    },
+    "tr": {
+      "intro": "Aşağıdaki liste, projedeki ⿻ kredilerinin güncel durumunu göstermektedir; bu, metinde daha ayrıntılı ele alındığı üzere katkıları izlemek için kullandığımız bir topluluk para birimidir. Her katkı sunan kişi, birden fazla türde katkı vermiş olsa bile tam olarak tek bir katkı alanı altında sınıflandırılmıştır. Kategoriler içindeki sıralama ve genel olarak yazı tipi boyutu, 2024 yılının Nisan ayı başı itibarıyla ⿻ varlıklarının niceliksel düzeyini gösterir; yukarıdaki bileşik görseli oluştururken de aynı ağırlıkları kullandık. Liste, yukarıda yeterince öne çıkarıldıkları için iki ana yazarı ve yalnızca kitaba övgü sundukları için kredi alan kişileri kapsam dışında bırakır; bu kişiler kitabın açılış sayfalarında ya da dış kapağında kredi sırasına göre listelenmiştir. Kayıtları tutmak için kullandığımız teknolojinin deneysel niteliği nedeniyle defterde oluşabilecek hatalar için özür diler, bunları çevrimiçi sürümde ve gelecek baskılarda düzelteceğimizi belirtiriz.",
+      "categories": { "Writing": "Yazım", "Editing": "Düzenleme", "Technical": "Teknik", "Translation": "Çeviri", "Visuals": "Görseller", "Data": "Veri", "Management": "Yönetim", "Public relations": "Halkla İlişkiler", "Research": "Araştırma" }
     }
   },
   "categories": [

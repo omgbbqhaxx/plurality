@@ -1,0 +1,8 @@
+![](https://raw.githubusercontent.com/pluralitybook/plurality/main/figs/author-AudreyGlen.jpg)
+
+ [E. Glen Weyl](https://www.glenweyl.com), [RadicalxChange](https://www.radicalxchange.org)'in kurucusu, [Microsoft Research](https://www.microsoft.com/en-us/research/) bünyesindeki [Plural Technology Collaboratory](https://aka.ms/plural) ile [Plurality Institute](https://plurality.institute)'ün kurucusu ve [*Radical Markets*](https://press.princeton.edu/books/hardcover/9780691177502/radical-markets) kitabının ortak yazarıdır.  [Audrey Tang](https://en.wikipedia.org/wiki/Audrey_Tang), [🇹🇼](https://en.wikipedia.org/wiki/Taiwan)'da [Dijital İşler Bakanlığı](https://en.wikipedia.org/wiki/Ministry_of_Digital_Affairs_%28Taiwan%29)'nın ilk bakanı ve 🌐 üzerindeki ilk [🏳️‍⚧️](https://en.wikipedia.org/wiki/List_of_transgender_political_office-holders) bakandır.                                                                                                
+<br></br>
+
+![](https://raw.githubusercontent.com/pluralitybook/plurality/main/figs/author-Community.png)
+
+Bu kitap açık kaynaklıdır ve içeriği, atıf verilerek ya da verilmeden, serbestçe kopyalanabilir.  Adı geçen ana yazarların yanı sıra, dünyanın dört bir yanındaki <span aria-label="Çoğulluk">⿻</span> topluluğundan onlarca kişi kitaba katkıda bulunmuş ve toplam işin büyük bölümünü üstlenmiştir.  Bu katkı sunanlar bir sonraki sayfada listelenmiş ve yüzlerinin makine tarafından üretilen, tek tek yüzleriyle döşenmiş bu harmanlamasında temsil edilmiştir.  Kitabın [https://www.plurality.net/](https://www.plurality.net/) adresindeki ücretsiz çevrimiçi sürümü, bu toplulukça ve bu kitapta anlatılan ilkelere göre yönetilerek gelişmeyi sürdürecektir.

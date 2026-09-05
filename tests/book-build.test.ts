@@ -1,8 +1,8 @@
 import { describe, expect, test, beforeEach, afterEach } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, unlinkSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { assembleChinese, assembleEnglish, validateCredits } from '../scripts/book/build'
+import { assembleChinese, assembleEnglish, assembleLocale, validateCredits } from '../scripts/book/build'
 import { generateManifest, parseChapter } from '../scripts/book/manifest'
 import { prepareVivliostyle } from '../scripts/book/prepare-vivliostyle'
 import { validateCandidate } from '../scripts/book/validate-candidate'
@@ -12,14 +12,18 @@ import { renderLegacyLocale, runLegacyOrchestrator } from '../scripts/book/rende
 import { PDFDocument } from 'pdf-lib'
 import AdmZip from 'adm-zip'
 import config from '../publication/vivliostyle.config.mjs'
+import { LOCALES, getLocale, isLocale } from '../scripts/book/locales.mjs'
 
 function fixtureRoot(locale = 'english'): string {
   const root = mkdtempSync(join(tmpdir(), 'plurality-book-'))
-  const source = join(root, 'contents', locale)
-  mkdirSync(source, { recursive: true })
+  // Manifest generation walks every registered locale, so every locale needs a
+  // source directory to exist. Individual tests then write only the files they
+  // care about, and adding a language never breaks unrelated tests.
+  for (const each of LOCALES) mkdirSync(join(root, 'contents', getLocale(each).directory), { recursive: true })
+  mkdirSync(join(root, 'contents', locale), { recursive: true })
   return root
 }
-const credits = { i18n: { en: { categories: { Writing: 'Writing' } }, zh: { categories: { Writing: '寫作' } } }, categories: [{ name: 'Writing', contributors: [{ name: 'Alice', pt: 2 }] }] }
+const credits = { i18n: { en: { categories: { Writing: 'Writing' } }, zh: { categories: { Writing: '寫作' } }, tr: { categories: { Writing: 'Yazım' } } }, categories: [{ name: 'Writing', contributors: [{ name: 'Alice', pt: 2 }] }] }
 
 describe('English book assembly', () => {
   test('preserves image and footnote transforms', () => {
@@ -110,6 +114,10 @@ describe('Manifest generation', () => {
     expect(manifest.locales['zh-TW'].manuscriptPath).toBe('zh-TW/Plurality-traditional-mandarin.md')
     expect(manifest.locales['zh-TW'].legacyOutputs.pdf).toBe('legacy/Plurality-traditional-mandarin.pdf')
     expect(manifest.locales['zh-TW'].vivliostyleOutputs.pdf).toBe('candidate/vivliostyle-zh-TW-candidate.pdf')
+    expect(manifest.locales.tr.manuscriptPath).toBe('tr/Plurality-turkish.md')
+    expect(manifest.locales.tr.legacyOutputs.pdf).toBe('legacy/Plurality-turkish.pdf')
+    expect(manifest.locales.tr.vivliostyleOutputs.pdf).toBe('candidate/vivliostyle-tr-candidate.pdf')
+    expect(manifest.locales.tr.title).toBe('Çoğulluk')
   })
 })
 
@@ -265,15 +273,19 @@ describe('Candidate validation', () => {
     const manifest = generateManifest(root, '2024-01-02', 'rev')
     mkdirSync(join(root, 'en'), { recursive: true })
     mkdirSync(join(root, 'zh-TW'), { recursive: true })
+    mkdirSync(join(root, 'tr'), { recursive: true })
     mkdirSync(join(root, 'candidate'), { recursive: true })
     
     writeFileSync(join(root, 'en', 'Plurality-english.md'), '')
     writeFileSync(join(root, 'zh-TW', 'Plurality-traditional-mandarin.md'), '')
+    writeFileSync(join(root, 'tr', 'Plurality-turkish.md'), '')
     
     await createMockPdf(join(root, 'candidate', 'vivliostyle-en-candidate.pdf'))
     createMockEpub(join(root, 'candidate', 'vivliostyle-en-candidate.epub'), true, false)
     await createMockPdf(join(root, 'candidate', 'vivliostyle-zh-TW-candidate.pdf'))
     createMockEpub(join(root, 'candidate', 'vivliostyle-zh-TW-candidate.epub'), true, false, '多元與唐鳳')
+    await createMockPdf(join(root, 'candidate', 'vivliostyle-tr-candidate.pdf'))
+    createMockEpub(join(root, 'candidate', 'vivliostyle-tr-candidate.epub'), true, false, 'Çoğulluk ve Weyl')
     
     writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest))
     
@@ -323,15 +335,19 @@ describe('Candidate validation', () => {
     const manifest = generateManifest(root, '2024-01-02', 'rev')
     mkdirSync(join(root, 'en'), { recursive: true })
     mkdirSync(join(root, 'zh-TW'), { recursive: true })
+    mkdirSync(join(root, 'tr'), { recursive: true })
     mkdirSync(join(root, 'candidate'), { recursive: true })
     
     writeFileSync(join(root, 'en', 'Plurality-english.md'), '')
     writeFileSync(join(root, 'zh-TW', 'Plurality-traditional-mandarin.md'), '')
+    writeFileSync(join(root, 'tr', 'Plurality-turkish.md'), '')
     
     await createMockPdf(join(root, 'candidate', 'vivliostyle-en-candidate.pdf'))
     createMockEpub(join(root, 'candidate', 'vivliostyle-en-candidate.epub'), true, false)
     await createMockPdf(join(root, 'candidate', 'vivliostyle-zh-TW-candidate.pdf'))
     createMockEpub(join(root, 'candidate', 'vivliostyle-zh-TW-candidate.epub'), true, false, '多元與唐鳳')
+    await createMockPdf(join(root, 'candidate', 'vivliostyle-tr-candidate.pdf'))
+    createMockEpub(join(root, 'candidate', 'vivliostyle-tr-candidate.epub'), true, false, 'Çoğulluk ve Weyl')
     
     writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest))
     
@@ -493,6 +509,8 @@ describe('Legacy validation', () => {
       createMockEpub(join(root, 'legacy', 'Plurality-english.epub'), true, false)
       await createMockPdf(join(root, 'legacy', 'Plurality-traditional-mandarin.pdf'))
       createMockEpub(join(root, 'legacy', 'Plurality-traditional-mandarin.epub'), true, false, '多元與唐鳳')
+      await createMockPdf(join(root, 'legacy', 'Plurality-turkish.pdf'))
+      createMockEpub(join(root, 'legacy', 'Plurality-turkish.epub'), true, false, 'Çoğulluk ve Weyl')
 
       writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest))
       await expect(validateLegacy(root)).resolves.toBeUndefined()
@@ -616,3 +634,104 @@ describe('Legacy orchestrator', () => {
   })
 })
 
+
+
+describe('Turkish locale', () => {
+  test('assembles with Turkish metadata and part headings', () => {
+    const root = fixtureRoot('turkish')
+    writeFileSync(join(root, 'contents', 'turkish', '0-0-ovguler.md'), '# Övgüler\n')
+    writeFileSync(join(root, 'contents', 'turkish', '1-onsoz.md'), '# Önsöz\nİçerik\n')
+    const result = assembleLocale(root, 'tr', '2024-01-02', credits)
+    expect(result.markdown).toContain('title: Çoğulluk')
+    expect(result.markdown).toContain('lang: tr')
+    expect(result.markdown).toContain('date: "2024-01-02"')
+    expect(result.markdown).toContain('# Kısım 1: Önsöz')
+    // Credit category labels resolve through the tr i18n key, not the en fallback.
+    expect(result.markdown).toContain('Yazım')
+  })
+
+  test('uses hyphenated footnote labels like English, not the CJK underscore form', () => {
+    const root = fixtureRoot('turkish')
+    writeFileSync(join(root, 'contents', 'turkish', '0-0-ovguler.md'), '# Övgüler\n')
+    writeFileSync(join(root, 'contents', 'turkish', '1-onsoz.md'), '# Önsöz\n[^not]\n')
+    const result = assembleLocale(root, 'tr', '2024-01-02', credits)
+    expect(result.markdown).toContain('[^1-not]')
+    expect(result.markdown).not.toContain('[^1_not]')
+  })
+
+  test('does not inherit CJK typesetting from the Mandarin edition', () => {
+    const tr = getLocale('tr')
+    const zh = getLocale('zh-TW')
+    // Regression guard: the pipeline used to branch on `locale === 'en' ? ... : ...`,
+    // which silently gave every non-English edition the Mandarin settings.
+    expect(tr.legacy.epubCss).toBeNull()
+    expect(tr.legacy.forceLangEnUs).toBe(false)
+    expect(tr.legacy.fontSize).toBe('18pt')
+    expect(tr.coverPdf).not.toBe(zh.coverPdf)
+    expect(tr.creditsKey).toBe('tr')
+    expect(tr.footnoteSeparator).toBe('-')
+  })
+})
+
+describe('Locale registry', () => {
+  test('rejects unknown locales instead of falling back', () => {
+    expect(isLocale('tr')).toBe(true)
+    expect(isLocale('de')).toBe(false)
+    expect(() => getLocale('de')).toThrow(/Unknown locale/)
+  })
+
+  test('keeps directories, prefixes and cover art distinct per locale', () => {
+    const directories = LOCALES.map((l) => getLocale(l).directory)
+    const prefixes = LOCALES.map((l) => getLocale(l).filePrefix)
+    expect(new Set(directories).size).toBe(LOCALES.length)
+    expect(new Set(prefixes).size).toBe(LOCALES.length)
+    for (const locale of LOCALES) {
+      const definition = getLocale(locale)
+      expect(definition.epubKeywords.length).toBeGreaterThan(0)
+      expect(Object.keys(definition.sections)).toHaveLength(8)
+    }
+  })
+})
+
+
+describe('Chapter source hygiene', () => {
+  // build.ts rewrites <img> tags into markdown using these exact regexes, so a
+  // malformed tag does not fail loudly: it silently loses its src, truncates
+  // its alt, or leaks raw markup into the rendered page. Two ways to get there
+  // are an apostrophe closing a single-quoted attribute early (very easy to hit
+  // in Turkish, "Arendt'in") and a mistyped separator such as width:"420".
+  const imgTag = /<img\b[^>]*>/g
+  const srcAttr = /\bsrc="([^"]+)"|\bsrc='([^']+)'/
+  // One well-formed attribute: name, optional ="value" / ='value' / =bare.
+  const attribute = /^[A-Za-z_:][-A-Za-z0-9_:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?/
+
+  /** Returns the leftover text when a tag's attributes do not fully parse. */
+  function unparsedRemainder(tag: string): string {
+    let rest = tag.replace(/^<img/, '').replace(/\/?>$/, '').trim()
+    while (rest.length > 0) {
+      const match = rest.match(attribute)
+      if (!match) return rest
+      rest = rest.slice(match[0].length).trim()
+    }
+    return ''
+  }
+
+  for (const locale of LOCALES) {
+    const directory = getLocale(locale).directory
+    test(`${locale}: every <img> tag parses cleanly`, () => {
+      const dir = join(process.cwd(), 'contents', directory)
+      const files = readdirSync(dir).filter((name) => name.endsWith('.md'))
+      expect(files.length).toBeGreaterThan(0)
+      for (const file of files) {
+        const content = readFileSync(join(dir, file), 'utf8')
+        for (const tag of content.match(imgTag) ?? []) {
+          expect(tag, `${directory}/${file}: <img> without a parseable src`).toMatch(srcAttr)
+          expect(
+            unparsedRemainder(tag),
+            `${directory}/${file}: <img> has unparseable attribute text — a quote likely closed an attribute early`
+          ).toBe('')
+        }
+      }
+    })
+  }
+})

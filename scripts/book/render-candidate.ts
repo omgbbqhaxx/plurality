@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { spawnSync, SpawnSyncOptions } from 'node:child_process'
 import { prepareVivliostyle } from './prepare-vivliostyle'
 import { validateCandidate } from './validate-candidate'
+import { LOCALES, isLocale } from './locales.mjs'
+import type { Locale } from './locales.d.mts'
 
 export type SpawnFn = (
   cmd: string,
@@ -16,7 +18,7 @@ const defaultSpawn: SpawnFn = (cmd, args, opts) => {
 }
 
 export async function renderLocale(
-  locale: 'en' | 'zh-TW',
+  locale: Locale,
   bookDate: string,
   outputRoot: string,
   spawnFn: SpawnFn = defaultSpawn
@@ -63,14 +65,13 @@ export async function renderLocale(
 }
 
 export async function runOrchestrator(
-  target: 'en' | 'zh-TW' | 'all',
+  target: Locale | 'all',
   bookDate: string,
   outputRoot: string,
   spawnFn: SpawnFn = defaultSpawn
 ): Promise<void> {
   if (target === 'all') {
-    await renderLocale('en', bookDate, outputRoot, spawnFn)
-    await renderLocale('zh-TW', bookDate, outputRoot, spawnFn)
+    for (const locale of LOCALES) await renderLocale(locale, bookDate, outputRoot, spawnFn)
     // Run candidate validation
     await validateCandidate(outputRoot)
   } else {
@@ -81,9 +82,9 @@ export async function runOrchestrator(
 // Cast import.meta to read Bun-specific main property during direct script execution
 const meta = import.meta as unknown as { main: boolean }
 if (meta.main) {
-  const target = process.argv[2] as 'en' | 'zh-TW' | 'all' | undefined
-  if (!target || (target !== 'en' && target !== 'zh-TW' && target !== 'all')) {
-    throw new Error('Usage: BOOK_DATE=YYYY-MM-DD bun scripts/book/render-candidate.ts <en|zh-TW|all>')
+  const target = process.argv[2] as Locale | 'all' | undefined
+  if (!target || (!isLocale(target) && target !== 'all')) {
+    throw new Error(`Usage: BOOK_DATE=YYYY-MM-DD bun scripts/book/render-candidate.ts <${LOCALES.join('|')}|all>`)
   }
   const bookDate = process.env.BOOK_DATE
   if (!bookDate || !/^\d{4}-\d{2}-\d{2}$/.test(bookDate)) {

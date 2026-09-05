@@ -2,6 +2,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { PDFDocument } from 'pdf-lib'
+import { LOCALES, getLocale } from './locales.mjs'
+import type { Locale } from './locales.d.mts'
 
 interface Chapter {
   id: string
@@ -29,7 +31,7 @@ interface BookManifest {
   schemaVersion: string
   sourceRevision: string
   publicationDate: string
-  locales: Record<'en' | 'zh-TW', LocaleManifest>
+  locales: Record<Locale, LocaleManifest>
 }
 
 async function getPdfPageCount(filePath: string): Promise<number> {
@@ -54,7 +56,7 @@ export async function validateLegacy(outputDir: string): Promise<void> {
   const minPdfBytes = parseInt(process.env.MIN_PDF_BYTES ?? '10000', 10)
   const minEpubBytes = parseInt(process.env.MIN_EPUB_BYTES ?? '10000', 10)
 
-  const locales: Array<'en' | 'zh-TW'> = ['en', 'zh-TW']
+  const locales = LOCALES
   for (const locale of locales) {
     const data = manifest.locales[locale]
     if (!data) {
@@ -142,7 +144,7 @@ export async function validateLegacy(outputDir: string): Promise<void> {
     }
 
     let hasLocaleText = false
-    const localeKeywords = locale === 'en' ? ['Plurality', 'Weyl'] : ['多元', '唐鳳']
+    const localeKeywords = getLocale(locale).epubKeywords
 
     for (const match of hrefMatches) {
       const href = match[1]
