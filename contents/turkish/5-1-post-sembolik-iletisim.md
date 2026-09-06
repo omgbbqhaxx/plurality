@@ -60,7 +60,7 @@ Daha uzak gelecekte, sembolik olmayan iletişimin evrimi yakınlık anlayışım
 
 Uzun mesafeli ilişkilerin de köklü bir dönüşüm geçirmesi beklenebilir. Fiziksel uzaklık yalnızca bağlantı hızlarının meselesi hâline gelir; coğrafi ayrılıktan bağımsız olarak düşüncelerin, duyguların ve duyusal deneyimlerin gerçek zamanlı paylaşılmasına olanak tanır. Sevgililer, arkadaşlar ve aile üyeleri birbirlerinin sevinçlerini, üzüntülerini ve sıradan anlarını aynı odadaymışçasına deneyimleyebilir ve fiziksel varlığı aşan bir yakınlık biçimi yaratabilir. Bu paradigma kayması toplumsal yapılarda derin değişiklikler getirir — geleneksel çekirdek aile, daha akışkan, küresel olarak birbirine bağlı ailesel ağlara yerini bırakabilir. Bu ufka doğru yol alırken insan bağının ve iletişiminin dokusu bir başkalaşım geçirmeye hazırlanıyor; mahrem biçimde bağlı olmanın ve "insan" olmanın ne anlama geldiğini yeniden tanımlıyor.
 
-[^Lowry] Lois Lowry'nin 1993 tarihli klasik gençlik romanı _The Giver_'da çarpıcı biçimde resmedildiği üzere.
+[^Lowry]: Lois Lowry'nin 1993 tarihli klasik gençlik romanı _The Giver_'da çarpıcı biçimde resmedildiği üzere.
 
 ### Post-sembolik iletişimin sınırlılıkları
 

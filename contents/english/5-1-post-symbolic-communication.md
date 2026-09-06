@@ -60,7 +60,7 @@ In the more distant future, the evolution of non-symbolic communication promises
 
 Long-distance relationships, too, can expect to undergo a radical transformation. Physical distance becomes a matter only of connection speeds, allowing for the sharing of thoughts, emotions, and sensory experiences in real-time, irrespective of geographic separation. Lovers, friends, and family members can experience each other's joys, sorrows, and mundane moments as if they were in the same room, creating a form of intimacy that transcends physical presence. This paradigm shift brings profound changes in societal structures – the traditional nuclear family could give way to more fluid, globally interconnected familial networks. As we steer towards this horizon, the very fabric of human connection and communication is poised to undergo a metamorphosis, redefining what it means to be intimately connected and be “human.”
 
-[^Lowry] As vividly illustrated in Lois Lowry's classic 1993 young adult novel _The Giver_.
+[^Lowry]: As vividly illustrated in Lois Lowry's classic 1993 young adult novel _The Giver_.
 
 ### Limits of post-symbolic communication
 

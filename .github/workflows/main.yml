@@ -21,49 +21,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
 
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
       - name: Verify
-        run: vp run check
+        run: bun run check
 
-  docs:
+  site:
     runs-on: ubuntu-latest
     needs: verify
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
 
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
-      - name: Build docs
-        run: vp run docs:build
+      - name: Build site
+        run: bun run site:build
 
       - name: Configure Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'pluralitybook'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
 
-      # NOTE: This artifact is used for GitHub Pages deployment. The repository Pages source
-      # must be switched from "gh-pages" branch to "GitHub Actions" only after this workflow goes green.
+      # NOTE: Set the repository's Pages source to "GitHub Actions" for this artifact
+      # to be served.
       - name: Upload Pages artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'pluralitybook'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
-          path: docs/.vitepress/dist
+          path: dist/site
   manifest:
     runs-on: ubuntu-latest
     needs: verify
@@ -71,15 +67,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
 
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Derive Variables
         run: |
@@ -87,7 +81,7 @@ jobs:
           echo "SOURCE_REVISION=${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Assemble book & manifest
-        run: vp run book:assemble
+        run: bun run book:assemble
 
       - name: Upload Manifest and Manuscripts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -109,15 +103,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
 
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Derive Variables
         run: |
@@ -125,7 +117,7 @@ jobs:
           echo "SOURCE_REVISION=${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Render legacy output
-        run: vp run book:legacy:${{ matrix.locale }}
+        run: bun run book:legacy:${{ matrix.locale }}
 
       - name: Upload legacy artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -140,15 +132,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
 
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Download manifest and manuscripts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -166,7 +156,7 @@ jobs:
       - name: Validate legacy outputs
         env:
           EXPECTED_SOURCE_REVISION: ${{ github.sha }}
-        run: vp run book:legacy:validate
+        run: bun run book:legacy:validate
 
   candidate:
     runs-on: ubuntu-latest
@@ -178,19 +168,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
       - name: Install fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y fonts-noto-cjk fonts-noto-color-emoji
 
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Derive Variables
         run: |
@@ -198,7 +186,7 @@ jobs:
           echo "SOURCE_REVISION=${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Render candidate output
-        run: vp run book:candidate:${{ matrix.locale }}
+        run: bun run book:candidate:${{ matrix.locale }}
 
       - name: Upload candidate artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -213,14 +201,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: '24'
-          cache: true
-          run-install: false
+          bun-version-file: package.json
       - name: Install dependencies (frozen)
-        run: vp install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Download manifest and manuscripts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -238,13 +224,13 @@ jobs:
       - name: Validate candidate outputs
         env:
           EXPECTED_SOURCE_REVISION: ${{ github.sha }}
-        run: vp run book:candidate:validate
+        run: bun run book:candidate:validate
 
   # GitHub Pages is configured to deploy from GitHub Actions.
   deploy-pages:
     runs-on: ubuntu-latest
-    needs: docs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'pluralitybook'
+    needs: site
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       pages: write
       id-token: write
@@ -256,7 +242,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [legacy-validation, docs]
+    needs: [legacy-validation, site]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'pluralitybook'
     permissions:
       contents: write

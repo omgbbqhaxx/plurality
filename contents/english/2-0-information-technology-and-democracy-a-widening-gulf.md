@@ -163,7 +163,7 @@ However, while these priorities are relatively recent and appear to emerge from 
 <figure>
 <img src="https://raw.githubusercontent.com/pluralitybook/plurality/main/figs/data/ai_ngrams/ai_ngrams.png" width="100%" alt='Shows the relative frequency in English books of "artificial intelligence" from 1950-2019 showing a surge in the late 1980s followed by a retreat and then a much greater surge beginning in the mid-2010s.'>
 
-**<figcaption> Figure 2-0-E. The relative frequency of "artificial intelligence in English books 1950-2019. Source: Google Ngrams[^Ngrams] </figcaption>**
+**<figcaption> Figure 2-0-E. The relative frequency of "artificial intelligence in English books 1950-2019. Source: Google Ngrams[^ngrams] </figcaption>**
 </figure>
 <br></br>
 
