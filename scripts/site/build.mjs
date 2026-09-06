@@ -67,6 +67,25 @@ const UI = {
     license: 'Bu eser CC0 ile kamu malı olarak sunulmuştur.',
     subtitle: 'İşbirliğine Dayalı Teknolojinin ve Demokrasinin Geleceği',
     editions: 'Sürümler',
+    // Presence of `listen` turns on the read-aloud player for this edition.
+    listen: {
+      label: 'Bölümü dinle',
+      play: 'Dinle',
+      pause: 'Duraklat',
+      resume: 'Devam et',
+      stop: 'Durdur',
+      speed: 'Hız',
+      voice: 'Ses',
+      unsupported: 'Tarayıcınız sesli okumayı desteklemiyor.',
+      noVoice: 'Tarayıcınızda Türkçe ses bulunamadı; sistem ayarlarından bir Türkçe ses ekleyebilirsiniz.',
+      progress: '{current} / {total}',
+      error: 'Ses oynatılamadı ({error}).',
+      downloading: 'Doğal Türkçe ses modeli indiriliyor… %{percent} (yalnızca ilk seferde)',
+      preparing: 'Hazırlanıyor…',
+      fallback: 'Doğal ses yüklenemedi; tarayıcının kendi sesiyle devam ediliyor.',
+      // Piper voice run in the browser; only the first visit downloads it.
+      model: 'https://huggingface.co/rhasspy/piper-voices/resolve/main/tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx',
+    },
   },
   'zh-TW': {
     read: '閱讀',
@@ -308,6 +327,27 @@ blockquote:lang(zh), em:lang(zh) { font-style: normal; }
 .lang-bar__link:hover { border-color: var(--teal); background: var(--warm); }
 .lang-bar--missing { opacity: 0.45; }
 
+/* Read-aloud player */
+.listen { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 2.5rem; padding: 12px 16px; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); background: var(--warm); border: 1px solid var(--border); border-radius: var(--radius); }
+.listen[hidden] { display: none; }
+.listen__label { font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.65rem; color: var(--gold); }
+.listen__buttons { display: flex; gap: 6px; }
+.listen__button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font: inherit; font-weight: 600; color: var(--heading); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.listen__button:hover:not(:disabled) { border-color: var(--teal); }
+.listen__button:disabled { opacity: 0.45; cursor: default; }
+.listen__button--play { color: #fff; background: var(--teal); border-color: var(--teal); }
+.listen__button svg { width: 12px; height: 12px; fill: currentColor; }
+.listen__icon[hidden] { display: none; }
+.listen__field { display: inline-flex; align-items: center; gap: 6px; }
+.listen__field select { font: inherit; color: var(--heading); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 6px; max-width: 12rem; }
+.listen__progress { margin-left: auto; font-variant-numeric: tabular-nums; }
+.listen__status { flex-basis: 100%; }
+.listen__status:empty { display: none; }
+.listen__bar { flex-basis: 100%; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.listen__bar span { display: block; height: 100%; width: 0; background: var(--teal); transition: width 0.3s; }
+.listen-current { background: color-mix(in srgb, var(--teal) 12%, transparent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--teal) 12%, transparent); border-radius: 2px; }
+@media (max-width: 600px) { .listen__progress { margin-left: 0; } }
+
 /* Read index */
 .read-page { max-width: var(--content-max); margin: 0 auto; padding: calc(var(--nav-height) + 60px) var(--pad-h) 80px; }
 .read-page h1 { margin-bottom: 0.5rem; }
@@ -503,7 +543,7 @@ blockquote:lang(zh), em:lang(zh) { font-style: normal; }
   html { scroll-behavior: auto; }
 }
 @media print {
-  .nav, .footer, .book__toc, .book__nav, .theme-toggle, .skip-link, .lang-bar { display: none !important; }
+  .nav, .footer, .book__toc, .book__nav, .theme-toggle, .skip-link, .lang-bar, .listen { display: none !important; }
   body { background: #fff; color: #000; }
   .book { padding: 0; }
   .book__page { box-shadow: none; border: none; padding: 0; max-width: 100%; }
@@ -551,6 +591,487 @@ const SCRIPT = `(function () {
   if (active && toc && window.innerWidth > 1024) {
     toc.scrollTop = Math.max(0, active.offsetTop - toc.clientHeight / 2);
   }
+
+  // Read-aloud player. Prefers a neural voice (Piper, run in a worker); falls
+  // back to the browser's own voices when the model cannot be loaded.
+  var player = document.querySelector(".listen");
+  var body = document.querySelector(".book__body");
+  if (player && body) {
+    var strings = JSON.parse(player.getAttribute("data-strings"));
+    var language = player.getAttribute("data-lang");
+    var modelUrl = player.getAttribute("data-model");
+    var workerUrl = player.getAttribute("data-worker");
+    var playButton = player.querySelector(".listen__button--play");
+    var stopButton = player.querySelector(".listen__button--stop");
+    var speedSelect = player.querySelector(".listen__speed");
+    var voiceSelect = player.querySelector(".listen__voice");
+    var progress = player.querySelector(".listen__progress");
+    var bar = player.querySelector(".listen__bar span");
+    var status = player.querySelector(".listen__status");
+    var iconPlay = player.querySelector(".listen__icon--play");
+    var iconPause = player.querySelector(".listen__icon--pause");
+    var playLabel = player.querySelector(".listen__play-label");
+
+    var blocks = Array.prototype.filter.call(
+      body.querySelectorAll("p, h2, h3, h4, li, figcaption, td, th"),
+      function (el) { return !el.querySelector("p, li") && el.textContent.trim() && !el.closest(".footnotes"); }
+    );
+    var segments = [];
+    blocks.forEach(function (el) {
+      var text = el.textContent.replace(/\\[\\d+\\]/g, "").replace(/\\s+/g, " ").trim();
+      text.split(/(?<=[.!?…])\\s+(?=[^\\s])/).forEach(function (sentence) {
+        if (sentence.trim()) segments.push({ el: el, text: sentence.trim() });
+      });
+    });
+
+    var index = 0;
+    var playing = false;
+    var current = null;
+
+    var setLabel = function (text, showPause) {
+      playLabel.textContent = text;
+      iconPlay.hidden = showPause;
+      iconPause.hidden = !showPause;
+    };
+    var highlight = function (el) {
+      if (current && current !== el) current.classList.remove("listen-current");
+      current = el;
+      if (el) {
+        el.classList.add("listen-current");
+        var rect = el.getBoundingClientRect();
+        if (rect.top < 80 || rect.bottom > window.innerHeight - 40) {
+          el.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
+      }
+    };
+    var update = function () {
+      progress.textContent = strings.progress.replace("{current}", Math.min(index + 1, segments.length)).replace("{total}", segments.length);
+      bar.style.width = (segments.length ? (index / segments.length) * 100 : 0) + "%";
+    };
+    var rate = function () { return parseFloat(speedSelect.value) || 1; };
+
+    // --- Neural engine -----------------------------------------------------
+    var neural = null;
+    if (modelUrl && workerUrl && window.Worker && window.WebAssembly && window.AudioContext) {
+      neural = (function () {
+        var worker = null;
+        var ready = null;
+        var pending = {};
+        var cache = {};
+        var nextId = 1;
+        var context = null;
+        var source = null;
+        var gain = null;
+        var startedAt = 0;
+        var pausedAt = 0;
+        var currentBuffer = null;
+        var onEnded = null;
+
+        var ensure = function () {
+          if (ready) return ready;
+          worker = new Worker(workerUrl);
+          ready = new Promise(function (resolve, reject) {
+            worker.onmessage = function (event) {
+              var message = event.data;
+              if (message.type === "progress") {
+                if (message.total) {
+                  var percent = Math.round((message.loaded / message.total) * 100);
+                  status.textContent = strings.downloading.replace("{percent}", percent);
+                  bar.style.width = percent + "%";
+                }
+              } else if (message.type === "ready") {
+                status.textContent = "";
+                resolve();
+              } else if (message.type === "audio") {
+                var entry = pending[message.id];
+                delete pending[message.id];
+                if (entry) entry.resolve({ pcm: new Float32Array(message.pcm), sampleRate: message.sampleRate });
+              } else if (message.type === "error") {
+                if (message.stage === "init") { reject(new Error(message.message)); }
+                var failed = pending[message.id];
+                delete pending[message.id];
+                if (failed) failed.reject(new Error(message.message));
+              }
+            };
+            worker.onerror = function (event) { reject(new Error(event.message || "worker")); };
+            worker.postMessage({ type: "init", modelUrl: modelUrl });
+          });
+          return ready;
+        };
+        var synthesize = function (i) {
+          if (cache[i]) return cache[i];
+          cache[i] = ensure().then(function () {
+            return new Promise(function (resolve, reject) {
+              var id = nextId++;
+              pending[id] = { resolve: resolve, reject: reject };
+              worker.postMessage({ type: "synthesize", id: id, text: segments[i].text, modelUrl: modelUrl });
+            });
+          }).then(function (audio) {
+            if (!context) context = new AudioContext();
+            var buffer = context.createBuffer(1, audio.pcm.length, audio.sampleRate);
+            buffer.copyToChannel(audio.pcm, 0);
+            return buffer;
+          });
+          cache[i].catch(function () { delete cache[i]; });
+          // Keep memory bounded: forget audio far behind the cursor.
+          Object.keys(cache).forEach(function (key) { if (key < i - 3) delete cache[key]; });
+          return cache[i];
+        };
+        var stopSource = function () {
+          if (source) { source.onended = null; try { source.stop(); } catch (e) {} source.disconnect(); source = null; }
+        };
+        var startAt = function (offset) {
+          stopSource();
+          source = context.createBufferSource();
+          source.buffer = currentBuffer;
+          source.playbackRate.value = rate();
+          if (!gain) { gain = context.createGain(); gain.connect(context.destination); }
+          source.connect(gain);
+          startedAt = context.currentTime - offset / rate();
+          source.onended = function () { source = null; if (onEnded) onEnded(); };
+          source.start(0, offset);
+        };
+        return {
+          speak: function (i, callbacks) {
+            onEnded = callbacks.onEnd;
+            status.textContent = strings.preparing;
+            synthesize(i).then(function (buffer) {
+              if (!playing || index !== i) return;
+              status.textContent = "";
+              if (context.state === "suspended") context.resume();
+              currentBuffer = buffer;
+              pausedAt = 0;
+              callbacks.onStart();
+              startAt(0);
+              if (i + 1 < segments.length) synthesize(i + 1);
+            }, function (error) { callbacks.onError(error); });
+          },
+          pause: function () {
+            if (!source || !currentBuffer) return;
+            pausedAt = Math.min((context.currentTime - startedAt) * rate(), currentBuffer.duration);
+            stopSource();
+          },
+          resume: function () {
+            if (!currentBuffer) return false;
+            if (context.state === "suspended") context.resume();
+            startAt(pausedAt);
+            return true;
+          },
+          setRate: function () {
+            if (source) source.playbackRate.value = rate();
+          },
+          cancel: function () { stopSource(); currentBuffer = null; pausedAt = 0; },
+          ready: ensure,
+        };
+      })();
+    }
+
+    // --- Browser voices (fallback) --------------------------------------------
+    var system = null;
+    if ("speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
+      system = (function () {
+        var synth = window.speechSynthesis;
+        var base = language.split("-")[0].toLowerCase();
+        var fullTag = { tr: "tr-TR", en: "en-US", zh: "zh-TW" }[base] || language;
+        var matches = function (v) { return v.lang && v.lang.toLowerCase().replace("_", "-").split("-")[0] === base; };
+        var pickVoice = function () {
+          var all = synth.getVoices();
+          var id = voiceSelect.value;
+          var fallback = null;
+          for (var i = 0; i < all.length; i++) {
+            if (all[i].voiceURI === id) return all[i];
+            if (!fallback && matches(all[i])) fallback = all[i];
+          }
+          return fallback;
+        };
+        var loadVoices = function () {
+          var voices = synth.getVoices().filter(matches);
+          var remembered = null;
+          try { remembered = localStorage.getItem("plurality-voice"); } catch (e) {}
+          voiceSelect.innerHTML = "";
+          voices.forEach(function (v) {
+            var option = document.createElement("option");
+            option.value = v.voiceURI;
+            option.textContent = v.name;
+            if (v.voiceURI === remembered) option.selected = true;
+            voiceSelect.appendChild(option);
+          });
+          voiceSelect.parentElement.hidden = voices.length < 2;
+        };
+        loadVoices();
+        if (typeof synth.onvoiceschanged !== "undefined") synth.addEventListener("voiceschanged", loadVoices);
+        var utterance = null;
+        return {
+          speak: function (i, callbacks) {
+            synth.cancel();
+            utterance = new SpeechSynthesisUtterance(segments[i].text);
+            var voice = pickVoice();
+            if (voice) utterance.voice = voice;
+            utterance.lang = voice && voice.lang ? voice.lang : fullTag;
+            utterance.rate = rate();
+            utterance.onstart = callbacks.onStart;
+            utterance.onend = callbacks.onEnd;
+            utterance.onerror = function (event) {
+              if (event.error === "interrupted" || event.error === "canceled") return;
+              callbacks.onError(new Error(event.error));
+            };
+            // cancel() settles asynchronously in some engines; give it a tick.
+            setTimeout(function () { if (playing && index === i) synth.speak(utterance); }, 60);
+          },
+          pause: function () { synth.cancel(); },
+          resume: function () { return false; },
+          setRate: function () {},
+          cancel: function () { synth.cancel(); },
+        };
+      })();
+    }
+
+    var engine = neural || system;
+    if (!engine) {
+      status.textContent = strings.unsupported;
+      playButton.disabled = true;
+      stopButton.disabled = true;
+    } else {
+      if (neural) voiceSelect.parentElement.hidden = true;
+
+      var speakCurrent = function () {
+        if (index >= segments.length) { finish(); return; }
+        var i = index;
+        engine.speak(i, {
+          onStart: function () { highlight(segments[i].el); update(); },
+          onEnd: function () {
+            if (!playing || index !== i) return;
+            index += 1;
+            speakCurrent();
+          },
+          onError: function (error) {
+            if (engine === neural && system) {
+              // Model unavailable (offline, blocked CDN…): continue with system voices.
+              engine = system;
+              voiceSelect.parentElement.hidden = voiceSelect.options.length < 2;
+              status.textContent = strings.fallback;
+              speakCurrent();
+              return;
+            }
+            status.textContent = strings.error.replace("{error}", error.message || error);
+            finish();
+          },
+        });
+      };
+      var finish = function () {
+        playing = false;
+        engine.cancel();
+        highlight(null);
+        index = 0;
+        update();
+        setLabel(strings.play, false);
+        stopButton.disabled = true;
+        status.textContent = "";
+      };
+
+      playButton.addEventListener("click", function () {
+        if (!segments.length) return;
+        if (playing) {
+          playing = false;
+          engine.pause();
+          setLabel(strings.resume, false);
+          return;
+        }
+        playing = true;
+        stopButton.disabled = false;
+        setLabel(strings.pause, true);
+        status.textContent = "";
+        if (!engine.resume()) speakCurrent();
+      });
+      stopButton.addEventListener("click", finish);
+      speedSelect.addEventListener("change", function () {
+        try { localStorage.setItem("plurality-speed", speedSelect.value); } catch (e) {}
+        if (!playing) return;
+        if (engine === system) speakCurrent(); else engine.setRate();
+      });
+      voiceSelect.addEventListener("change", function () {
+        try { localStorage.setItem("plurality-voice", voiceSelect.value); } catch (e) {}
+        if (playing) speakCurrent();
+      });
+      // Clicking a paragraph while listening jumps there.
+      body.addEventListener("click", function (event) {
+        if (!playing) return;
+        var target = event.target.closest("p, h2, h3, h4, li, figcaption, td, th");
+        if (!target || event.target.closest("a")) return;
+        for (var i = 0; i < segments.length; i++) {
+          if (segments[i].el === target) { index = i; engine.cancel(); speakCurrent(); break; }
+        }
+      });
+      window.addEventListener("pagehide", function () { engine.cancel(); });
+
+      try {
+        var savedSpeed = localStorage.getItem("plurality-speed");
+        if (savedSpeed) speedSelect.value = savedSpeed;
+      } catch (e) {}
+      stopButton.disabled = true;
+      update();
+    }
+  }
+})();
+`
+
+/**
+ * Neural read-aloud worker (Piper voices via ONNX Runtime, all in the browser).
+ * The model and phonemizer assets are fetched once and kept in the Cache API.
+ */
+const TTS_WORKER = `(function () {
+  var ORT_BASE = "https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.18.0/";
+  var PHONEMIZE_BASE = "https://cdn.jsdelivr.net/npm/@diffusionstudio/piper-wasm@1.0.0/build/piper_phonemize";
+  var CACHE_NAME = "plurality-tts-v1";
+  var MAX_CHUNK = 320;
+
+  var session = null;
+  var config = null;
+  var phonemizeWasm = null;
+  var phonemizeData = null;
+  var initPromise = null;
+
+  function post(message, transfer) { self.postMessage(message, transfer || []); }
+
+  // Fetches through the Cache API, reporting download progress the first time.
+  function cachedBuffer(url, label) {
+    return (self.caches ? caches.open(CACHE_NAME) : Promise.resolve(null)).then(function (cache) {
+      var lookup = cache ? cache.match(url) : Promise.resolve(null);
+      return lookup.then(function (hit) {
+        if (hit) return hit.arrayBuffer();
+        return fetch(url).then(function (res) {
+          if (!res.ok) throw new Error(label + ": HTTP " + res.status);
+          var total = parseInt(res.headers.get("Content-Length") || "0", 10);
+          var reader = res.body.getReader();
+          var chunks = [];
+          var loaded = 0;
+          function pump() {
+            return reader.read().then(function (result) {
+              if (result.done) return;
+              chunks.push(result.value);
+              loaded += result.value.byteLength;
+              post({ type: "progress", label: label, loaded: loaded, total: total });
+              return pump();
+            });
+          }
+          return pump().then(function () {
+            var blob = new Blob(chunks);
+            if (cache) {
+              cache.put(url, new Response(blob, { headers: { "Content-Type": res.headers.get("Content-Type") || "application/octet-stream" } })).catch(function () {});
+            }
+            return blob.arrayBuffer();
+          });
+        });
+      });
+    });
+  }
+
+  function init(options) {
+    if (initPromise) return initPromise;
+    initPromise = Promise.resolve().then(function () {
+      importScripts(ORT_BASE + "ort.min.js", PHONEMIZE_BASE + ".js");
+      ort.env.wasm.wasmPaths = ORT_BASE;
+      ort.env.wasm.numThreads = 1;
+      var modelUrl = options.modelUrl;
+      return Promise.all([
+        cachedBuffer(modelUrl + ".json", "config"),
+        cachedBuffer(PHONEMIZE_BASE + ".wasm", "phonemizer"),
+        cachedBuffer(PHONEMIZE_BASE + ".data", "phonemizer-data"),
+        cachedBuffer(modelUrl, "model"),
+      ]);
+    }).then(function (buffers) {
+      config = JSON.parse(new TextDecoder().decode(buffers[0]));
+      phonemizeWasm = buffers[1];
+      phonemizeData = buffers[2];
+      return ort.InferenceSession.create(buffers[3], { executionProviders: ["wasm"] });
+    }).then(function (created) {
+      session = created;
+      post({ type: "ready", sampleRate: config.audio.sample_rate });
+    });
+    return initPromise;
+  }
+
+  function phonemize(text) {
+    return new Promise(function (resolve, reject) {
+      var lines = [];
+      createPiperPhonemize({
+        print: function (line) { lines.push(line); },
+        printErr: function (line) { if (line) console.warn("piper_phonemize:", line); },
+        wasmBinary: phonemizeWasm,
+        getPreloadedPackage: function () { return phonemizeData.slice(0); },
+        locateFile: function (file) { return PHONEMIZE_BASE + file.slice(file.lastIndexOf(".")); },
+      }).then(function (module) {
+        module.callMain(["-l", config.espeak.voice, "--input", JSON.stringify([{ text: text }]), "--espeak_data", "/espeak-ng-data"]);
+        var ids = [];
+        lines.forEach(function (line) {
+          try { ids = ids.concat(JSON.parse(line).phoneme_ids); } catch (e) {}
+        });
+        if (!ids.length) reject(new Error("phonemize: no output"));
+        else resolve(ids);
+      }, reject);
+    });
+  }
+
+  function infer(ids) {
+    var feeds = {
+      input: new ort.Tensor("int64", BigInt64Array.from(ids.map(function (id) { return BigInt(id); })), [1, ids.length]),
+      input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(ids.length)])),
+      scales: new ort.Tensor("float32", Float32Array.from([config.inference.noise_scale, config.inference.length_scale, config.inference.noise_w])),
+    };
+    if (config.speaker_id_map && Object.keys(config.speaker_id_map).length) {
+      feeds.sid = new ort.Tensor("int64", BigInt64Array.from([BigInt(0)]));
+    }
+    return session.run(feeds).then(function (result) { return result.output.data; });
+  }
+
+  // Long sentences are split on punctuation, then on words, to bound latency.
+  function chunk(text) {
+    text = text.trim();
+    if (text.length <= MAX_CHUNK) return [text];
+    var parts = text.split(/(?<=[,;:])\\s+/);
+    var out = [];
+    var current = "";
+    parts.forEach(function (part) {
+      if ((current + " " + part).trim().length > MAX_CHUNK && current) { out.push(current.trim()); current = ""; }
+      if (part.length > MAX_CHUNK) {
+        part.split(/\\s+/).forEach(function (word) {
+          if ((current + " " + word).trim().length > MAX_CHUNK && current) { out.push(current.trim()); current = ""; }
+          current += " " + word;
+        });
+      } else {
+        current += " " + part;
+      }
+    });
+    if (current.trim()) out.push(current.trim());
+    return out;
+  }
+
+  function synthesize(text) {
+    var pieces = chunk(text);
+    var pcms = [];
+    return pieces.reduce(function (chain, piece) {
+      return chain.then(function () { return phonemize(piece); }).then(infer).then(function (pcm) { pcms.push(pcm); });
+    }, Promise.resolve()).then(function () {
+      var length = pcms.reduce(function (sum, pcm) { return sum + pcm.length; }, 0);
+      var merged = new Float32Array(length);
+      var offset = 0;
+      pcms.forEach(function (pcm) { merged.set(pcm, offset); offset += pcm.length; });
+      return merged;
+    });
+  }
+
+  self.onmessage = function (event) {
+    var message = event.data;
+    if (message.type === "init") {
+      init(message).catch(function (error) { post({ type: "error", stage: "init", message: String(error && error.message || error) }); });
+    } else if (message.type === "synthesize") {
+      init(message).then(function () { return synthesize(message.text); }).then(function (pcm) {
+        post({ type: "audio", id: message.id, pcm: pcm.buffer, sampleRate: config.audio.sample_rate }, [pcm.buffer]);
+      }).catch(function (error) {
+        post({ type: "error", stage: "synthesize", id: message.id, message: String(error && error.message || error) });
+      });
+    }
+  };
 })();
 `
 
@@ -691,6 +1212,27 @@ ${groups}
   )
 }
 
+/** Read-aloud bar; only for editions whose UI strings define `listen`. */
+function listenPlayer(locale, language, up) {
+  const strings = UI[locale]?.listen
+  if (!strings) return ''
+  const speeds = ['0.8', '0.9', '1', '1.1', '1.25', '1.5', '1.75', '2']
+    .map((rate) => `<option value="${rate}"${rate === '1' ? ' selected' : ''}>${rate}×</option>`)
+    .join('')
+  return `<div class="listen" role="group" aria-label="${escapeHtml(strings.label)}" data-lang="${language}" data-model="${escapeHtml(strings.model ?? '')}" data-worker="${up}assets/tts-worker.js" data-strings="${escapeHtml(JSON.stringify(strings))}">
+<span class="listen__label">${escapeHtml(strings.label)}</span>
+<span class="listen__buttons">
+<button type="button" class="listen__button listen__button--play"><svg class="listen__icon listen__icon--play" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z"/></svg><svg class="listen__icon listen__icon--pause" viewBox="0 0 12 12" aria-hidden="true" hidden><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg><span class="listen__play-label">${escapeHtml(strings.play)}</span></button>
+<button type="button" class="listen__button listen__button--stop" disabled><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5h9v9h-9z"/></svg>${escapeHtml(strings.stop)}</button>
+</span>
+<label class="listen__field">${escapeHtml(strings.speed)} <select class="listen__speed">${speeds}</select></label>
+<label class="listen__field" hidden>${escapeHtml(strings.voice)} <select class="listen__voice"></select></label>
+<span class="listen__progress" aria-live="polite"></span>
+<div class="listen__bar" aria-hidden="true"><span></span></div>
+<p class="listen__status" role="status"></p>
+</div>`
+}
+
 function renderChapter(site, outputRoot, locale, index) {
   const config = getLocale(locale)
   const strings = ui(locale)
@@ -750,6 +1292,7 @@ ${toc}
 ${languageBar(site, locale, chapter.number)}
 <div class="book__header-ornament" aria-hidden="true"><span></span><span></span><span></span></div>
 </header>
+${listenPlayer(locale, config.language, '../')}
 <div class="${bodyClasses.join(' ')}">
 ${wrapTables(chapter.html)}
 </div>
@@ -810,6 +1353,7 @@ export function buildSite(root, outputRoot) {
   mkdirSync(join(outputRoot, 'assets'), { recursive: true })
   writeFileSync(join(outputRoot, 'assets', 'style.css'), STYLES)
   writeFileSync(join(outputRoot, 'assets', 'site.js'), SCRIPT)
+  writeFileSync(join(outputRoot, 'assets', 'tts-worker.js'), TTS_WORKER)
   // GitHub Pages runs Jekyll over uploaded files unless told not to, which would
   // strip the assets directory and anything else it considers private.
   writeFileSync(join(outputRoot, '.nojekyll'), '')
