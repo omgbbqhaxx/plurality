@@ -6,7 +6,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "tsc --noEmit && vitest run",
-    "site:build": "bun scripts/site/build.ts dist/site",
+    "site:build": "bun scripts/site/build.mjs dist/site",
     "book:assemble": "bun scripts/book/build.ts all dist/publication",
     "book:manifest": "bun scripts/book/manifest.ts dist/publication",
     "book:candidate:prepare": "bun scripts/book/prepare-vivliostyle.ts",
